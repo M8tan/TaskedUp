@@ -1,0 +1,3 @@
+module TaskedUp
+
+go 1.25.1
