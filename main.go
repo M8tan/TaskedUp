@@ -5,13 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"strings"
+	"time"
 )
 
 type Task struct {
 	Index       int    `json:"index"`
 	Description string `json:"description"`
+	Status      string `json:"status"`
 }
 
 var Storage_File_Name = "TaskedUpStorage.json"
@@ -19,26 +22,26 @@ var Backup_Storage_File_Name = "TaskedUpStorageBackup.json"
 
 func Show_Start_Menu() {
 	fmt.Println("# * # * # * # * # * # * # * # * # * # *")
-	fmt.Println("* 1. Show this menu                   #")
-	fmt.Println("# 2. Show all registered tasks        *")
-	fmt.Println("* 3. Add new task                     #")
-	fmt.Println("# 4. Remove existing task             *")
-	fmt.Println("* 5. Delete all tasks                 #")
-	fmt.Println("# 6. Backup tasks                     *")
-	fmt.Println("* 7. Restore tasks                    #")
-	fmt.Println("# 8. We'll see                        *")
+	fmt.Println("* 0. Show operation menu              #")
+	fmt.Println("# 1. Show all registered tasks        *")
+	fmt.Println("* 2. Add new task                     #")
+	fmt.Println("# 3. Update existing task             *")
+	fmt.Println("* 4. Remove existing task             #")
+	fmt.Println("# 5. Delete all tasks                 *")
+	fmt.Println("* 6. Backup tasks                     #")
+	fmt.Println("# 7. Restore tasks                    *")
 	fmt.Println("* 10. Exit                            #")
 	fmt.Println("# * # * # * # * # * # * # * # * # * # *")
 }
 func Show_Menu() {
-	fmt.Println("1. Show this menu")
-	fmt.Println("2. Show all registered tasks")
-	fmt.Println("3. Add new task")
+	fmt.Println("0. Show operation menu")
+	fmt.Println("1. Show all registered tasks")
+	fmt.Println("2. Add new task")
+	fmt.Println("3. Update existing task")
 	fmt.Println("4. Remove existing task")
 	fmt.Println("5. Delete all tasks")
 	fmt.Println("6. Backup tasks")
 	fmt.Println("7. Restore tasks")
-	fmt.Println("8. We'll see")
 	fmt.Println("10. Exit")
 }
 func Create_Storage_File() {
@@ -83,9 +86,46 @@ func Get_Tasks() string {
 	}
 	result := ""
 	for _, task := range tasks {
-		result += fmt.Sprintf("%d. %s\n", task.Index, task.Description)
+		result += fmt.Sprintf("%d. %s - %s\n", task.Index, task.Description, task.Status)
 	}
 	return result
+}
+func Update_Task(Task_Index int, Task_Status string) {
+	Storage_File_Content, err := os.ReadFile(Storage_File_Name)
+	if os.IsNotExist(err) {
+		Storage_File_Content = []byte("[]")
+		err = nil
+	}
+	if err != nil {
+		fmt.Println("Error reading file, ", err)
+		return
+	}
+	if len(Storage_File_Content) == 0 {
+		Storage_File_Content = []byte("[]")
+	}
+	var tasks []Task
+	if err := json.Unmarshal(Storage_File_Content, &tasks); err != nil {
+		fmt.Println("Error decoding file, ", err)
+		return
+	}
+	Task_Index--
+	if Task_Index < 0 || Task_Index >= len(tasks) {
+		fmt.Println("No such task")
+		return
+	}
+	Old_Status := tasks[Task_Index].Status
+	tasks[Task_Index].Status = Task_Status
+	Updated_Tasks, err := json.MarshalIndent(tasks, "", " ")
+	if err != nil {
+		fmt.Println("Can't encode task, ", err)
+		return
+	}
+	err = os.WriteFile(Storage_File_Name, Updated_Tasks, 0644)
+	if err != nil {
+		fmt.Println("Can't update task, ", err)
+		return
+	}
+	fmt.Printf("Updated task #%d: %s\nOld status: %s,\nNew status: %s\n", Task_Index, tasks[Task_Index].Description, Old_Status, Task_Status)
 }
 func Get_Last_Task_Index() int {
 	Storage_File_Content, err := os.ReadFile(Storage_File_Name)
@@ -106,7 +146,7 @@ func Get_Last_Task_Index() int {
 	}
 	return tasks[len(tasks)-1].Index
 }
-func Add_Task(Task_Description string) {
+func Add_Task(Task_Description string, Task_Status string) {
 	Storage_File_Content, err := os.ReadFile(Storage_File_Name)
 	if os.IsNotExist(err) {
 		Storage_File_Content = []byte("[]")
@@ -129,7 +169,7 @@ func Add_Task(Task_Description string) {
 		OldIndex = tasks[len(tasks)-1].Index
 	}
 
-	New_Task := Task{Index: OldIndex + 1, Description: Task_Description}
+	New_Task := Task{Index: OldIndex + 1, Description: Task_Description, Status: Task_Status}
 	tasks = append(tasks, New_Task)
 	Updated_Tasks, err := json.MarshalIndent(tasks, "", " ")
 	if err != nil {
@@ -183,6 +223,46 @@ func Remove_Task(Task_Index int) {
 	}
 	fmt.Printf("Removed task %d - %s\n", TaskToRemove.Index, TaskToRemove.Description)
 }
+func Get_Task_By_Index(Task_Index int) string {
+	Storage_File_Content, err := os.ReadFile(Storage_File_Name)
+	if err != nil {
+		return fmt.Sprintf("Error reading file, %v", err)
+	}
+	if len(Storage_File_Content) == 0 {
+		return "No registerd tasks :)"
+	}
+	var tasks []Task
+	if err := json.Unmarshal(Storage_File_Content, &tasks); err != nil {
+		return fmt.Sprintf("Error decoding file, %v", err)
+	}
+	if len(tasks) == 0 {
+		return "No registerd tasks :)"
+	}
+	Task_Index -= 1
+	if Task_Index < 0 || Task_Index >= len(tasks) {
+		return "No such task"
+	}
+	return tasks[Task_Index].Description
+}
+func Random_Greeting(Task_Description string) string {
+	Rand_Source := rand.NewSource(time.Now().UnixNano())
+	Randomed := rand.New(Rand_Source)
+	Random_Number := Randomed.Intn(5)
+	switch Random_Number {
+	case 0:
+		return "Well done!"
+	case 1:
+		return fmt.Sprintf("Congrats on completing task: %s", Task_Description)
+	case 2:
+		return "Congratulations :)"
+	case 3:
+		return "Good job"
+	case 4:
+		return fmt.Sprintf("Finished %s!", Task_Description)
+	default:
+		return "Hell yeah!"
+	}
+}
 func Remove_All_Tasks() {
 	Clean := []byte("")
 	err := os.WriteFile(Storage_File_Name, Clean, 0644)
@@ -192,7 +272,6 @@ func Remove_All_Tasks() {
 	}
 	fmt.Println(("Removed all tasks"))
 }
-
 func Backup_Tasks() {
 	Backup_Storage_File, err := os.Create("TaskedUpStorageBackup.json")
 	if err != nil {
@@ -251,23 +330,51 @@ func main() {
 		fmt.Print("Choose an operation to perform: ")
 		fmt.Scanln(&User_Choice)
 		switch User_Choice {
-		case "1":
+		case "0":
 			Show_Menu()
-		case "2":
+		case "1":
 			fmt.Println(Get_Tasks())
-		case "3":
+		case "2":
 			Reader := bufio.NewReader(os.Stdin)
 			fmt.Print("Ok! Enter the tasks description: ")
 			Task_Description, _ := Reader.ReadString('\n')
 			Task_Description = strings.TrimSpace(Task_Description)
-			Add_Task(Task_Description)
+			fmt.Print("Great, now enter the tasks status: ")
+			Task_Status, _ := Reader.ReadString('\n')
+			Task_Status = strings.TrimSpace(Task_Status)
+			Add_Task(Task_Description, Task_Status)
+		case "3":
+			Reader := bufio.NewReader(os.Stdin)
+			var Index int
+			fmt.Print("OK! Enter task number: ")
+			fmt.Scanln(&Index)
+			fmt.Print("Great! Now, enter the tasks new status: ")
+			Status, _ := Reader.ReadString('\n')
+			Status = strings.TrimSpace(Status)
+			Update_Task(Index, Status)
 		case "4":
 			var Index int
 			fmt.Print("Enter the tasks number: ")
 			fmt.Scanln(&Index)
 			Remove_Task(Index)
+			Removed_Description := Get_Task_By_Index(Index)
+			fmt.Println(Random_Greeting(Removed_Description))
 		case "5":
-			Remove_All_Tasks()
+			var YesOrNo string
+			fmt.Print("Are you sure? {y/n}: ")
+			fmt.Scanln(&YesOrNo)
+			switch YesOrNo {
+			case "y":
+				Remove_All_Tasks()
+			case "Y":
+				Remove_All_Tasks()
+			case "n":
+				fmt.Println("OK!")
+			case "N":
+				fmt.Println("OK!")
+			default:
+				fmt.Println("Invalid choice")
+			}
 		case "6":
 			Backup_Tasks()
 		case "7":
