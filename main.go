@@ -192,6 +192,7 @@ func Remove_All_Tasks() {
 	}
 	fmt.Println(("Removed all tasks"))
 }
+
 func Backup_Tasks() {
 	Backup_Storage_File, err := os.Create("TaskedUpStorageBackup.json")
 	if err != nil {
