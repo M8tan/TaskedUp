@@ -49,8 +49,20 @@ func Create_Storage_File() {
 	}
 	defer Storage_File.Close()
 }
+func Create_Backup_Storage_File() {
+	Backup_Storage_File, err := os.Create(Backup_Storage_File_Name)
+	if err != nil {
+		fmt.Println("Can't create backup storage file, ", err)
+		return
+	}
+	defer Backup_Storage_File.Close()
+}
 func Storage_File_Exists() bool {
 	_, err := os.Stat(Storage_File_Name)
+	return !errors.Is(err, os.ErrNotExist)
+}
+func Backup_Storage_File_Exists() bool {
+	_, err := os.Stat(Backup_Storage_File_Name)
 	return !errors.Is(err, os.ErrNotExist)
 }
 func Get_Tasks() string {
@@ -61,7 +73,19 @@ func Get_Tasks() string {
 	if len(Storage_File_Content) == 0 {
 		return "No registered tasks :)"
 	}
-	return string(Storage_File_Content)
+	var tasks []Task
+	err = json.Unmarshal(Storage_File_Content, &tasks)
+	if err != nil {
+		return fmt.Sprintf("Error getting tasks, %v", err)
+	}
+	if len(tasks) == 0 {
+		return "No registered tasks :)"
+	}
+	result := ""
+	for _, task := range tasks {
+		result += fmt.Sprintf("%d. %s\n", task.Index, task.Description)
+	}
+	return result
 }
 func Get_Last_Task_Index() int {
 	Storage_File_Content, err := os.ReadFile(Storage_File_Name)
@@ -119,7 +143,46 @@ func Add_Task(Task_Description string) {
 	}
 	fmt.Printf("Added task %s\n", New_Task.Description)
 }
-func Remove_Task(task_index int) {}
+func Remove_Task(Task_Index int) {
+	Storage_File_Content, err := os.ReadFile(Storage_File_Name)
+	if err != nil {
+		fmt.Println("Error reading file, ", err)
+		return
+	}
+	if len(Storage_File_Content) == 0 {
+		fmt.Println("No registerd tasks :)")
+		return
+	}
+	var tasks []Task
+	if err := json.Unmarshal(Storage_File_Content, &tasks); err != nil {
+		fmt.Println("Error decoding file, ", err)
+		return
+	}
+	if len(tasks) == 0 {
+		fmt.Println("No registerd tasks :)")
+		return
+	}
+	Task_Index -= 1
+	if Task_Index < 0 || Task_Index >= len(tasks) {
+		fmt.Println("No such task")
+		return
+	}
+	TaskToRemove := tasks[Task_Index]
+	tasks = append(tasks[:Task_Index], tasks[Task_Index+1:]...)
+	for i := range tasks {
+		tasks[i].Index = i + 1
+	}
+	Updated_Tasks, err := json.MarshalIndent(tasks, "", " ")
+	if err != nil {
+		fmt.Println("Error encoding tasks, ", err)
+		return
+	}
+	if err := os.WriteFile(Storage_File_Name, Updated_Tasks, 0644); err != nil {
+		fmt.Println("Error removing task, ", err)
+		return
+	}
+	fmt.Printf("Removed task %d - %s\n", TaskToRemove.Index, TaskToRemove.Description)
+}
 func Remove_All_Tasks() {
 	Clean := []byte("")
 	err := os.WriteFile(Storage_File_Name, Clean, 0644)
@@ -152,7 +215,26 @@ func Backup_Tasks() {
 	defer Backup_Storage_File.Close()
 	fmt.Println("Backed up tasks :)")
 }
-func Restore_Tasks() {}
+func Restore_Tasks() {
+	if !Backup_Storage_File_Exists() {
+		Create_Backup_Storage_File()
+	}
+	if !Storage_File_Exists() {
+		Create_Storage_File()
+	}
+	Backup_Storage_File_Content, err := os.ReadFile(Backup_Storage_File_Name)
+	if err != nil {
+		fmt.Println("Error reading tasks, ", err)
+		return
+	}
+	if len(Backup_Storage_File_Content) == 0 {
+		fmt.Println("No registered tasks to restore")
+		return
+	}
+	os.WriteFile(Storage_File_Name, Backup_Storage_File_Content, 0644)
+	fmt.Println("Restored tasks :)")
+
+}
 
 func main() {
 	if !Storage_File_Exists() {
@@ -178,10 +260,17 @@ func main() {
 			Task_Description, _ := Reader.ReadString('\n')
 			Task_Description = strings.TrimSpace(Task_Description)
 			Add_Task(Task_Description)
+		case "4":
+			var Index int
+			fmt.Print("Enter the tasks number: ")
+			fmt.Scanln(&Index)
+			Remove_Task(Index)
 		case "5":
 			Remove_All_Tasks()
 		case "6":
 			Backup_Tasks()
+		case "7":
+			Restore_Tasks()
 		case "10":
 			Running = false
 		default:
