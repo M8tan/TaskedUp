@@ -1,5 +1,5 @@
 TaskedUp - a task management system
-Run InstallerV5.exe to install the app locally.
+Run InstallerV6.exe to install the app locally.
 You have several usage ways -
 you can open the run dialog box {press the windows key and the R key}, type taskedup and hit enter.
 It will run the currently installed TaskedUp version.
