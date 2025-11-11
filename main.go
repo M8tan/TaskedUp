@@ -90,6 +90,28 @@ func Get_Tasks() string {
 	}
 	return result
 }
+func Get_Tasks_4_TXT_Conversion() string {
+	Storage_File_Content, err := os.ReadFile(Storage_File_Name)
+	if err != nil {
+		return fmt.Sprintf("Can't read storage file, %v", err)
+	}
+	if len(Storage_File_Content) == 0 {
+		return "No registered tasks :)"
+	}
+	var tasks []Task
+	err = json.Unmarshal(Storage_File_Content, &tasks)
+	if err != nil {
+		return fmt.Sprintf("Error getting tasks, %v", err)
+	}
+	if len(tasks) == 0 {
+		return "No registered tasks :)"
+	}
+	result := ""
+	for _, task := range tasks {
+		result += fmt.Sprintf("%d. %s - %s\r\n", task.Index, task.Description, task.Status)
+	}
+	return result
+}
 func Update_Task(Task_Index int, Task_Status string) {
 	Storage_File_Content, err := os.ReadFile(Storage_File_Name)
 	if os.IsNotExist(err) {
@@ -145,6 +167,21 @@ func Get_Last_Task_Index() int {
 		return 0
 	}
 	return tasks[len(tasks)-1].Index
+}
+func Task_Exists(Task_Index int) bool {
+	Storage_File_Content, err := os.ReadFile(Storage_File_Name)
+	if err != nil || len(Storage_File_Content) == 0 {
+		return false
+	}
+	var tasks []Task
+	if err = json.Unmarshal(Storage_File_Content, &tasks); err != nil {
+		return false
+	}
+	if len(tasks) == 0 {
+		return false
+	}
+	Task_Index--
+	return Task_Index >= 0 && Task_Index < len(tasks)
 }
 func Add_Task(Task_Description string, Task_Status string) {
 	Storage_File_Content, err := os.ReadFile(Storage_File_Name)
@@ -273,7 +310,7 @@ func Remove_All_Tasks() {
 	fmt.Println(("Removed all tasks"))
 }
 func Backup_Tasks() {
-	Backup_Storage_File, err := os.Create("TaskedUpStorageBackup.json")
+	Backup_Storage_File, err := os.Create(Backup_Storage_File_Name)
 	if err != nil {
 		fmt.Println("Error creating backup, ", err)
 	}
@@ -315,7 +352,20 @@ func Restore_Tasks() {
 	fmt.Println("Restored tasks :)")
 
 }
-
+func Convert_To_TXT() {
+	if !Storage_File_Exists() {
+		fmt.Println("No storage file")
+		Create_Storage_File()
+		return
+	}
+	Storage_File_Content := Get_Tasks_4_TXT_Conversion()
+	err := os.WriteFile("TaskedUpStorageText.txt", []byte(Storage_File_Content), 0644)
+	if err != nil {
+		fmt.Println("Can't write to file, ", err)
+		return
+	}
+	fmt.Println("Converted to txt :)")
+}
 func main() {
 	if !Storage_File_Exists() {
 		Create_Storage_File()
@@ -348,10 +398,14 @@ func main() {
 			var Index int
 			fmt.Print("OK! Enter task number: ")
 			fmt.Scanln(&Index)
-			fmt.Print("Great! Now, enter the tasks new status: ")
-			Status, _ := Reader.ReadString('\n')
-			Status = strings.TrimSpace(Status)
-			Update_Task(Index, Status)
+			if !Task_Exists(Index) {
+				fmt.Println("No such task")
+			} else {
+				fmt.Print("Great! Now, enter the tasks new status: ")
+				Status, _ := Reader.ReadString('\n')
+				Status = strings.TrimSpace(Status)
+				Update_Task(Index, Status)
+			}
 		case "4":
 			var Index int
 			fmt.Print("Enter the tasks number: ")
@@ -365,8 +419,10 @@ func main() {
 			fmt.Scanln(&YesOrNo)
 			switch YesOrNo {
 			case "y":
+				Backup_Tasks()
 				Remove_All_Tasks()
 			case "Y":
+				Backup_Tasks()
 				Remove_All_Tasks()
 			case "n":
 				fmt.Println("OK!")
@@ -378,9 +434,25 @@ func main() {
 		case "6":
 			Backup_Tasks()
 		case "7":
-			Restore_Tasks()
+			var YesOrNo string
+			fmt.Print("Are you sure? {y/n}: ")
+			fmt.Scanln(&YesOrNo)
+			switch YesOrNo {
+			case "y":
+				Restore_Tasks()
+			case "Y":
+				Restore_Tasks()
+			case "n":
+				fmt.Println("OK!")
+			case "N":
+				fmt.Println("OK!")
+			default:
+				fmt.Println("Invalid choice")
+			}
 		case "10":
 			Running = false
+		case "txt":
+			Convert_To_TXT()
 		default:
 			fmt.Println("Sorry, but ", User_Choice, " is an invalid choice")
 		}
