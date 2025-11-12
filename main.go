@@ -17,8 +17,8 @@ type Task struct {
 	Status      string `json:"status"`
 }
 
-var Storage_File_Name = "TaskedUpStorage.json"
-var Backup_Storage_File_Name = "TaskedUpStorageBackup.json"
+var Storage_File_Name = "C:\\TaskedUp\\TaskedUpStorage.json"
+var Backup_Storage_File_Name = "C:\\TaskedUp\\TaskedUpStorageBackup.json"
 
 func Show_Start_Menu() {
 	fmt.Println("# * # * # * # * # * # * # * # * # * # *")
